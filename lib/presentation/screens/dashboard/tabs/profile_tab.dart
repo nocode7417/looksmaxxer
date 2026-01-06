@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../providers/providers.dart';
+import '../../../../data/models/models.dart';
 import '../../../widgets/common/common_widgets.dart';
 
 class ProfileTab extends ConsumerWidget {

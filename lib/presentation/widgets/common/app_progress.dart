@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/constants/app_constants.dart';
 
 /// Linear progress bar with optional label
 class AppProgressBar extends StatelessWidget {
