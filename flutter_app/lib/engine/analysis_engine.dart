@@ -1,16 +1,193 @@
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../data/models/photo_model.dart';
+import '../data/models/ml_analysis_model.dart';
 import '../core/constants/app_constants.dart';
+import 'ml_facial_analyzer.dart';
 
-/// Analysis engine for generating facial metrics (mock implementation)
-/// Matches the original React app's analysis.js functionality
+/// Analysis engine for generating facial metrics
+/// Uses ML Kit for real analysis with mock fallback
 class AnalysisEngine {
   static final Random _random = Random();
+  static MLFacialAnalyzer? _mlAnalyzer;
+  static bool _mlKitAvailable = true;
+
+  /// Initialize ML Kit analyzer
+  static Future<void> initializeMLKit() async {
+    if (_mlAnalyzer != null && _mlAnalyzer!.isInitialized) return;
+
+    try {
+      _mlAnalyzer = MLFacialAnalyzer();
+      await _mlAnalyzer!.initialize();
+      _mlKitAvailable = true;
+    } catch (e) {
+      _mlKitAvailable = false;
+      _mlAnalyzer = null;
+    }
+  }
+
+  /// Check if ML Kit is available
+  static bool get isMLKitAvailable => _mlKitAvailable && _mlAnalyzer != null;
 
   /// Analyze a photo and generate metrics
-  /// Uses image seed for consistent results with same image
+  /// Uses ML Kit when available, falls back to mock implementation
   static Future<Map<String, MetricValue>> analyzePhoto(
+    Uint8List imageData, {
+    ui.Size? imageSize,
+    bool forceMock = false,
+  }) async {
+    // Try ML Kit first if available
+    if (!forceMock && isMLKitAvailable) {
+      try {
+        final result = await _analyzeWithMLKit(imageData, imageSize);
+        if (result != null) {
+          return result;
+        }
+      } catch (e) {
+        // Fall through to mock
+      }
+    }
+
+    // Fall back to mock implementation
+    return _analyzeWithMock(imageData);
+  }
+
+  /// Analyze using ML Kit
+  static Future<Map<String, MetricValue>?> _analyzeWithMLKit(
+    Uint8List imageData,
+    ui.Size? imageSize,
+  ) async {
+    if (_mlAnalyzer == null) return null;
+
+    // Create InputImage from bytes
+    final inputImage = InputImage.fromBytes(
+      bytes: imageData,
+      metadata: InputImageMetadata(
+        size: imageSize ?? const ui.Size(640, 480),
+        rotation: InputImageRotation.rotation0deg,
+        format: InputImageFormat.nv21,
+        bytesPerRow: imageSize?.width.toInt() ?? 640,
+      ),
+    );
+
+    // Detect faces
+    final faces = await _mlAnalyzer!.detectFaces(inputImage);
+    if (faces.isEmpty) return null;
+
+    // Select best face
+    final bestFace = _mlAnalyzer!.selectBestFrame(faces);
+    if (bestFace == null) return null;
+
+    // Extract landmarks
+    final landmarks = _mlAnalyzer!.extractLandmarks(bestFace);
+
+    // Calculate measurements
+    final measurements = _mlAnalyzer!.calculateMeasurements(
+      landmarks,
+      bestFace,
+      frameCount: 1,
+    );
+
+    // Convert FacialMeasurement to MetricValue
+    final now = DateTime.now();
+    return measurements.map((key, measurement) => MapEntry(
+      key,
+      MetricValue(
+        value: measurement.value,
+        confidence: measurement.confidence * 100,
+        measuredAt: now,
+      ),
+    ));
+  }
+
+  /// Analyze with multi-frame capture for improved accuracy
+  static Future<MLAnalysisResult> analyzeWithMultiFrame(
+    List<Uint8List> frames,
+    ui.Size imageSize,
+  ) async {
+    if (!isMLKitAvailable || _mlAnalyzer == null) {
+      // Return mock result
+      final mockMetrics = await _analyzeWithMock(frames.first);
+      return MLAnalysisResult(
+        measurements: mockMetrics.map((key, value) => MapEntry(
+          key,
+          FacialMeasurement(
+            metricId: key,
+            value: value.value,
+            uncertainty: 5.0,
+            confidence: value.confidence / 100,
+            measuredAt: value.measuredAt,
+          ),
+        )),
+        qualityGate: QualityGateResult.allPassed(),
+        frameCount: 1,
+        usedMLKit: false,
+        analyzedAt: DateTime.now(),
+      );
+    }
+
+    final allFaces = <Face>[];
+    QualityGateResult? bestQuality;
+
+    for (final frame in frames) {
+      try {
+        final inputImage = InputImage.fromBytes(
+          bytes: frame,
+          metadata: InputImageMetadata(
+            size: imageSize,
+            rotation: InputImageRotation.rotation0deg,
+            format: InputImageFormat.nv21,
+            bytesPerRow: imageSize.width.toInt(),
+          ),
+        );
+
+        final faces = await _mlAnalyzer!.detectFaces(inputImage);
+        if (faces.isNotEmpty) {
+          final face = faces.first;
+          allFaces.add(face);
+
+          // Check quality gates
+          final quality = _mlAnalyzer!.validateQualityGates(face, imageSize);
+          if (bestQuality == null || quality.passed && !bestQuality.passed) {
+            bestQuality = quality;
+          }
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    if (allFaces.isEmpty) {
+      throw AnalysisException('No faces detected in any frame');
+    }
+
+    // Select best frame
+    final bestFace = _mlAnalyzer!.selectBestFrame(allFaces);
+    if (bestFace == null) {
+      throw AnalysisException('Could not select best frame');
+    }
+
+    // Extract landmarks and calculate measurements
+    final landmarks = _mlAnalyzer!.extractLandmarks(bestFace);
+    final measurements = _mlAnalyzer!.calculateMeasurements(
+      landmarks,
+      bestFace,
+      frameCount: allFaces.length,
+    );
+
+    return MLAnalysisResult(
+      measurements: measurements,
+      qualityGate: bestQuality ?? QualityGateResult.allPassed(),
+      frameCount: allFaces.length,
+      usedMLKit: true,
+      analyzedAt: DateTime.now(),
+    );
+  }
+
+  /// Mock implementation fallback
+  static Future<Map<String, MetricValue>> _analyzeWithMock(
     Uint8List imageData,
   ) async {
     // Simulate processing delay (anti-dopamine design)
@@ -63,6 +240,12 @@ class AnalysisEngine {
         measuredAt: now,
       ),
     };
+  }
+
+  /// Dispose ML Kit resources
+  static void dispose() {
+    _mlAnalyzer?.dispose();
+    _mlAnalyzer = null;
   }
 
   /// Generate a seed from image data for consistent results
@@ -187,4 +370,15 @@ extension MetricTrendExtension on MetricTrend {
         return '\u2193'; // Down arrow
     }
   }
+}
+
+/// Exception thrown during analysis
+class AnalysisException implements Exception {
+  final String message;
+  final Object? cause;
+
+  AnalysisException(this.message, [this.cause]);
+
+  @override
+  String toString() => 'AnalysisException: $message${cause != null ? ' ($cause)' : ''}';
 }

@@ -6,8 +6,13 @@ import 'data/models/models.dart';
 import 'data/services/services.dart';
 import 'engine/engine.dart';
 import 'providers/providers.dart';
+import 'providers/hydration_provider.dart';
+import 'providers/mewing_provider.dart';
+import 'providers/chewing_provider.dart';
+import 'providers/usage_tracking_provider.dart';
 import 'presentation/screens/onboarding/welcome_screen.dart';
 import 'presentation/screens/onboarding/capture_rules_screen.dart';
+import 'presentation/screens/onboarding/hydration_setup_screen.dart';
 import 'presentation/screens/camera/camera_screen.dart';
 import 'presentation/screens/analysis/report_screen.dart';
 import 'presentation/screens/dashboard/dashboard_screen.dart';
@@ -20,6 +25,7 @@ enum AppScreen {
   camera,
   analyzing,
   report,
+  hydrationSetup,
   dashboard,
 }
 
@@ -44,6 +50,15 @@ class _LooksmaxxerAppState extends ConsumerState<LooksmaxxerApp> {
   Future<void> _initializeApp() async {
     // Load app state
     await ref.read(appStateProvider.notifier).initialize();
+
+    // Initialize habit providers
+    await ref.read(hydrationNotifierProvider.notifier).initialize();
+    await ref.read(mewingNotifierProvider.notifier).initialize();
+    await ref.read(chewingNotifierProvider.notifier).initialize();
+    await ref.read(usageTrackingNotifierProvider.notifier).initialize();
+
+    // Start usage tracking session
+    ref.read(usageTrackingNotifierProvider.notifier).startSession('app');
 
     // Determine initial screen
     final hasCompletedOnboarding =
@@ -135,6 +150,25 @@ class _LooksmaxxerAppState extends ConsumerState<LooksmaxxerApp> {
 
   Future<void> _completeOnboarding() async {
     await ref.read(appStateProvider.notifier).completeOnboarding();
+
+    // Show hydration setup if not already completed
+    final hasCompletedHydrationSetup =
+        ref.read(appStateProvider).hasCompletedHydrationSetup;
+
+    if (!hasCompletedHydrationSetup) {
+      _navigateTo(AppScreen.hydrationSetup);
+    } else {
+      _navigateTo(AppScreen.dashboard);
+    }
+  }
+
+  Future<void> _completeHydrationSetup() async {
+    await ref.read(appStateProvider.notifier).completeHydrationSetup();
+    _navigateTo(AppScreen.dashboard);
+  }
+
+  void _skipHydrationSetup() {
+    ref.read(appStateProvider.notifier).completeHydrationSetup();
     _navigateTo(AppScreen.dashboard);
   }
 
@@ -222,6 +256,12 @@ class _LooksmaxxerAppState extends ConsumerState<LooksmaxxerApp> {
               _navigateTo(AppScreen.dashboard);
             }
           },
+        );
+
+      case AppScreen.hydrationSetup:
+        return HydrationSetupScreen(
+          onComplete: _completeHydrationSetup,
+          onSkip: _skipHydrationSetup,
         );
 
       case AppScreen.dashboard:
