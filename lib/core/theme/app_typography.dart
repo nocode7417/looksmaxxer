@@ -41,6 +41,15 @@ class AppTypography {
     height: 1.35,
   );
 
+  // Title Medium - 18px, semibold (alias for compatibility)
+  static const TextStyle titleMedium = TextStyle(
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.36,
+    color: AppColors.textPrimary,
+    height: 1.3,
+  );
+
   // Body - 15px, normal
   static const TextStyle body = TextStyle(
     fontSize: 15,
@@ -57,6 +66,15 @@ class AppTypography {
     letterSpacing: -0.24,
     color: AppColors.textPrimary,
     height: 1.5,
+  );
+
+  // Body Small - 14px, normal
+  static const TextStyle bodySmall = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    letterSpacing: -0.2,
+    color: AppColors.textPrimary,
+    height: 1.45,
   );
 
   // Caption - 13px, secondary color

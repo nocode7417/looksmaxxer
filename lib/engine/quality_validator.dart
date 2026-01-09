@@ -1,11 +1,14 @@
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:image/image.dart' as img;
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../data/models/photo_model.dart';
+import '../data/models/ml_analysis_model.dart';
 import '../core/constants/app_constants.dart';
 
 /// Quality validation for captured photos
-/// Matches the original React app's QualityValidator functionality
+/// Includes both image quality and face-specific quality gates
 class QualityValidator {
   /// Analyze image quality
   static Future<QualityScore> analyzeQuality(Uint8List imageData) async {
@@ -197,6 +200,276 @@ class QualityValidator {
 
     return feedback;
   }
+
+  // ==================== Face-Specific Quality Gates ====================
+
+  /// Validate face size relative to image
+  static FaceSizeValidation validateFaceSize(Face face, ui.Size imageSize) {
+    final boundingBox = face.boundingBox;
+    final faceWidthRatio = boundingBox.width / imageSize.width;
+
+    return FaceSizeValidation(
+      passed: faceWidthRatio >= AppConstants.minFaceWidthRatio &&
+          faceWidthRatio <= AppConstants.maxFaceWidthRatio,
+      faceWidthRatio: faceWidthRatio,
+      minRequired: AppConstants.minFaceWidthRatio,
+      maxAllowed: AppConstants.maxFaceWidthRatio,
+    );
+  }
+
+  /// Validate head pose angles
+  static PoseValidation validatePose(Face face) {
+    final pitch = face.headEulerAngleX ?? 0.0;
+    final yaw = face.headEulerAngleY ?? 0.0;
+    final roll = face.headEulerAngleZ ?? 0.0;
+
+    return PoseValidation.validate(
+      pitch: pitch,
+      yaw: yaw,
+      roll: roll,
+    );
+  }
+
+  /// Validate lighting symmetry by analyzing brightness on left/right sides of face
+  static Future<LightingValidation> validateLighting(
+    Uint8List imageData,
+    Face face,
+  ) async {
+    try {
+      final image = img.decodeImage(imageData);
+      if (image == null) {
+        return LightingValidation.validate(
+          leftBrightness: 0.5,
+          rightBrightness: 0.5,
+        );
+      }
+
+      final boundingBox = face.boundingBox;
+      final centerX = boundingBox.center.dx.toInt();
+      final topY = boundingBox.top.toInt().clamp(0, image.height - 1);
+      final bottomY = boundingBox.bottom.toInt().clamp(0, image.height - 1);
+      final leftX = boundingBox.left.toInt().clamp(0, image.width - 1);
+      final rightX = boundingBox.right.toInt().clamp(0, image.width - 1);
+
+      // Sample left side of face
+      double leftBrightness = _sampleRegionBrightness(
+        image,
+        leftX,
+        topY,
+        centerX,
+        bottomY,
+      );
+
+      // Sample right side of face
+      double rightBrightness = _sampleRegionBrightness(
+        image,
+        centerX,
+        topY,
+        rightX,
+        bottomY,
+      );
+
+      // Normalize to 0-1 range
+      leftBrightness = leftBrightness / 255.0;
+      rightBrightness = rightBrightness / 255.0;
+
+      return LightingValidation.validate(
+        leftBrightness: leftBrightness,
+        rightBrightness: rightBrightness,
+      );
+    } catch (e) {
+      return LightingValidation.validate(
+        leftBrightness: 0.5,
+        rightBrightness: 0.5,
+      );
+    }
+  }
+
+  /// Sample average brightness of a region
+  static double _sampleRegionBrightness(
+    img.Image image,
+    int x1,
+    int y1,
+    int x2,
+    int y2,
+  ) {
+    double totalBrightness = 0;
+    int pixelCount = 0;
+
+    // Ensure valid bounds
+    x1 = x1.clamp(0, image.width - 1);
+    x2 = x2.clamp(0, image.width - 1);
+    y1 = y1.clamp(0, image.height - 1);
+    y2 = y2.clamp(0, image.height - 1);
+
+    if (x1 >= x2 || y1 >= y2) return 128;
+
+    final step = max(1, ((x2 - x1) * (y2 - y1)) ~/ 100);
+
+    for (int y = y1; y < y2; y += step) {
+      for (int x = x1; x < x2; x += step) {
+        final pixel = image.getPixel(x, y);
+        final r = pixel.r.toInt();
+        final g = pixel.g.toInt();
+        final b = pixel.b.toInt();
+        final brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+        totalBrightness += brightness;
+        pixelCount++;
+      }
+    }
+
+    return pixelCount > 0 ? totalBrightness / pixelCount : 128;
+  }
+
+  /// Complete face quality validation
+  static Future<FaceQualityResult> validateFaceQuality(
+    Uint8List imageData,
+    Face face,
+    ui.Size imageSize,
+  ) async {
+    final faceSize = validateFaceSize(face, imageSize);
+    final pose = validatePose(face);
+    final lighting = await validateLighting(imageData, face);
+
+    final qualityGate = QualityGateResult.fromValidations(
+      faceSize: faceSize,
+      pose: pose,
+      lighting: lighting,
+    );
+
+    final feedback = getFaceQualityFeedback(
+      faceSize: faceSize,
+      pose: pose,
+      lighting: lighting,
+    );
+
+    return FaceQualityResult(
+      qualityGate: qualityGate,
+      faceSize: faceSize,
+      pose: pose,
+      lighting: lighting,
+      feedback: feedback,
+    );
+  }
+
+  /// Get feedback messages for face quality issues
+  static List<QualityFeedback> getFaceQualityFeedback({
+    required FaceSizeValidation faceSize,
+    required PoseValidation pose,
+    required LightingValidation lighting,
+  }) {
+    final feedback = <QualityFeedback>[];
+
+    // Face size feedback
+    if (!faceSize.passed) {
+      if (faceSize.faceWidthRatio < faceSize.minRequired) {
+        feedback.add(QualityFeedback(
+          type: QualityFeedbackType.warning,
+          message: 'Face is too small. Move closer to the camera.',
+        ));
+      } else {
+        feedback.add(QualityFeedback(
+          type: QualityFeedbackType.warning,
+          message: 'Face is too large. Move back from the camera.',
+        ));
+      }
+    }
+
+    // Pose feedback
+    if (!pose.passed) {
+      if (pose.pitch.abs() > AppConstants.maxPoseAngleDegrees) {
+        feedback.add(QualityFeedback(
+          type: QualityFeedbackType.warning,
+          message: pose.pitch > 0
+              ? 'Tilt your head down slightly.'
+              : 'Tilt your head up slightly.',
+        ));
+      }
+      if (pose.yaw.abs() > AppConstants.maxPoseAngleDegrees) {
+        feedback.add(QualityFeedback(
+          type: QualityFeedbackType.warning,
+          message: 'Face the camera directly.',
+        ));
+      }
+      if (pose.roll.abs() > AppConstants.maxPoseAngleDegrees) {
+        feedback.add(QualityFeedback(
+          type: QualityFeedbackType.warning,
+          message: 'Keep your head level.',
+        ));
+      }
+    }
+
+    // Lighting feedback
+    if (!lighting.passed) {
+      feedback.add(QualityFeedback(
+        type: QualityFeedbackType.warning,
+        message: 'Uneven lighting detected. Face a light source directly.',
+      ));
+    }
+
+    // Success message
+    if (feedback.isEmpty) {
+      feedback.add(QualityFeedback(
+        type: QualityFeedbackType.success,
+        message: 'Perfect positioning! Ready to capture.',
+      ));
+    }
+
+    return feedback;
+  }
+
+  /// Calculate overall face quality score (0-100)
+  static double calculateFaceQualityScore(FaceQualityResult result) {
+    double score = 100;
+
+    // Face size penalty
+    if (!result.faceSize.passed) {
+      final ratio = result.faceSize.faceWidthRatio;
+      if (ratio < result.faceSize.minRequired) {
+        score -= (result.faceSize.minRequired - ratio) * 100;
+      } else {
+        score -= (ratio - result.faceSize.maxAllowed) * 50;
+      }
+    }
+
+    // Pose penalty
+    if (!result.pose.passed) {
+      final maxAngle = [
+        result.pose.pitch.abs(),
+        result.pose.yaw.abs(),
+        result.pose.roll.abs(),
+      ].reduce(max);
+      score -= (maxAngle - AppConstants.maxPoseAngleDegrees) * 2;
+    }
+
+    // Lighting penalty
+    if (!result.lighting.passed) {
+      score -= result.lighting.asymmetryPercent * 0.5;
+    }
+
+    return score.clamp(0, 100);
+  }
+}
+
+/// Complete face quality result
+class FaceQualityResult {
+  final QualityGateResult qualityGate;
+  final FaceSizeValidation faceSize;
+  final PoseValidation pose;
+  final LightingValidation lighting;
+  final List<QualityFeedback> feedback;
+
+  FaceQualityResult({
+    required this.qualityGate,
+    required this.faceSize,
+    required this.pose,
+    required this.lighting,
+    required this.feedback,
+  });
+
+  bool get passed => qualityGate.passed;
+
+  double get score => QualityValidator.calculateFaceQualityScore(this);
 }
 
 /// Quality feedback message

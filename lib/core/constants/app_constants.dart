@@ -24,8 +24,42 @@ class AppConstants {
 
   // Database
   static const String databaseName = 'looksmaxxer.db';
-  static const int databaseVersion = 1;
+  static const int databaseVersion = 2;
   static const String photosTable = 'photos';
+  static const String hydrationLogsTable = 'hydration_logs';
+  static const String hydrationGoalsTable = 'hydration_goals';
+  static const String mewingSessionsTable = 'mewing_sessions';
+  static const String chewingSessionsTable = 'chewing_sessions';
+  static const String usageSessionsTable = 'usage_sessions';
+  static const String interventionsLogTable = 'interventions_log';
+
+  // Hydration Defaults
+  static const int defaultHydrationGoalMl = 2500;
+  static const double hydrationMlPerKgSedentary = 30.0;
+  static const double hydrationMlPerKgModerate = 32.0;
+  static const double hydrationMlPerKgActive = 35.0;
+
+  // Mewing Milestones (days)
+  static const List<int> mewingMilestones = [7, 30, 90, 180, 365];
+
+  // Chewing Defaults
+  static const int chewingBeginnerMinutes = 10;
+  static const int chewingIntermediateMinutes = 20;
+  static const int chewingAdvancedMinutes = 30;
+  static const int chewingTmjWarningMinutes = 60;
+
+  // Mental Health / Usage Tracking Thresholds
+  static const int maxDailyAnalyses = 5;
+  static const int maxWeeklyAnalyses = 20;
+  static const int consecutiveDaysWarning = 7;
+  static const int rapidAnalysisThresholdSeconds = 30;
+  static const int rapidAnalysisCount = 3;
+
+  // ML Kit Quality Gates
+  static const double minFaceWidthRatio = 0.30;
+  static const double maxFaceWidthRatio = 0.80;
+  static const double maxPoseAngleDegrees = 15.0;
+  static const double maxLightingAsymmetry = 0.20;
 
   // Progress Unlock Requirements
   static const int minDaysForProgress = 14;

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/models.dart';
+import '../data/models/chewing_model.dart';
 import '../data/services/services.dart';
 import '../engine/engine.dart';
 import '../game/game.dart';
@@ -108,6 +109,24 @@ class AppStateNotifier extends StateNotifier<AppStateModel> {
     await _saveState();
   }
 
+  /// Complete hydration setup
+  Future<void> completeHydrationSetup() async {
+    state = state.copyWith(hasCompletedHydrationSetup: true);
+    await _saveState();
+  }
+
+  /// Set chewing level
+  Future<void> setChewingLevel(ChewingLevel level) async {
+    state = state.copyWith(chewingLevel: level);
+    await _saveState();
+  }
+
+  /// Mark notifications as requested
+  Future<void> markNotificationsRequested() async {
+    state = state.copyWith(hasRequestedNotifications: true);
+    await _saveState();
+  }
+
   /// Reset all data
   Future<void> resetAllData() async {
     await _preferencesService.resetAllData();
@@ -198,4 +217,16 @@ final todaysChallengeProvider = Provider<Challenge>((ref) {
 
 final progressScoreProvider = Provider<double?>((ref) {
   return ref.watch(appStateProvider).progressScore;
+});
+
+final hasCompletedHydrationSetupProvider = Provider<bool>((ref) {
+  return ref.watch(appStateProvider).hasCompletedHydrationSetup;
+});
+
+final hasRequestedNotificationsProvider = Provider<bool>((ref) {
+  return ref.watch(appStateProvider).hasRequestedNotifications;
+});
+
+final appChewingLevelProvider = Provider<ChewingLevel>((ref) {
+  return ref.watch(appStateProvider).chewingLevel;
 });

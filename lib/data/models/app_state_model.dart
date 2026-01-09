@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'photo_model.dart';
+import 'chewing_model.dart';
 
 /// Main app state model
 class AppStateModel {
   final bool hasCompletedOnboarding;
+  final bool hasCompletedHydrationSetup;
+  final bool hasRequestedNotifications;
   final String? baselinePhotoId;
   final DateTime? baselineDate;
   final Map<String, MetricValue> metrics;
@@ -13,11 +16,14 @@ class AppStateModel {
   final DateTime? lastChallengeDate;
   final double? progressScore;
   final DateTime? progressUnlockedAt;
+  final ChewingLevel chewingLevel;
   final AppSettings settings;
   final DateTime createdAt;
 
   AppStateModel({
     this.hasCompletedOnboarding = false,
+    this.hasCompletedHydrationSetup = false,
+    this.hasRequestedNotifications = false,
     this.baselinePhotoId,
     this.baselineDate,
     this.metrics = const {},
@@ -27,6 +33,7 @@ class AppStateModel {
     this.lastChallengeDate,
     this.progressScore,
     this.progressUnlockedAt,
+    this.chewingLevel = ChewingLevel.beginner,
     AppSettings? settings,
     DateTime? createdAt,
   })  : settings = settings ?? AppSettings(),
@@ -41,6 +48,8 @@ class AppStateModel {
   String toJson() {
     return jsonEncode({
       'hasCompletedOnboarding': hasCompletedOnboarding,
+      'hasCompletedHydrationSetup': hasCompletedHydrationSetup,
+      'hasRequestedNotifications': hasRequestedNotifications,
       'baselinePhotoId': baselinePhotoId,
       'baselineDate': baselineDate?.toIso8601String(),
       'metrics': metrics.map((k, v) => MapEntry(k, v.toMap())),
@@ -50,6 +59,7 @@ class AppStateModel {
       'lastChallengeDate': lastChallengeDate?.toIso8601String(),
       'progressScore': progressScore,
       'progressUnlockedAt': progressUnlockedAt?.toIso8601String(),
+      'chewingLevel': chewingLevel.name,
       'settings': settings.toMap(),
       'createdAt': createdAt.toIso8601String(),
     });
@@ -60,6 +70,8 @@ class AppStateModel {
     final map = jsonDecode(json) as Map<String, dynamic>;
     return AppStateModel(
       hasCompletedOnboarding: map['hasCompletedOnboarding'] ?? false,
+      hasCompletedHydrationSetup: map['hasCompletedHydrationSetup'] ?? false,
+      hasRequestedNotifications: map['hasRequestedNotifications'] ?? false,
       baselinePhotoId: map['baselinePhotoId'],
       baselineDate: map['baselineDate'] != null
           ? DateTime.parse(map['baselineDate'])
@@ -84,6 +96,12 @@ class AppStateModel {
       progressUnlockedAt: map['progressUnlockedAt'] != null
           ? DateTime.parse(map['progressUnlockedAt'])
           : null,
+      chewingLevel: map['chewingLevel'] != null
+          ? ChewingLevel.values.firstWhere(
+              (l) => l.name == map['chewingLevel'],
+              orElse: () => ChewingLevel.beginner,
+            )
+          : ChewingLevel.beginner,
       settings: map['settings'] != null
           ? AppSettings.fromMap(map['settings'])
           : AppSettings(),
@@ -95,6 +113,8 @@ class AppStateModel {
 
   AppStateModel copyWith({
     bool? hasCompletedOnboarding,
+    bool? hasCompletedHydrationSetup,
+    bool? hasRequestedNotifications,
     String? baselinePhotoId,
     DateTime? baselineDate,
     Map<String, MetricValue>? metrics,
@@ -104,12 +124,17 @@ class AppStateModel {
     DateTime? lastChallengeDate,
     double? progressScore,
     DateTime? progressUnlockedAt,
+    ChewingLevel? chewingLevel,
     AppSettings? settings,
     DateTime? createdAt,
   }) {
     return AppStateModel(
       hasCompletedOnboarding:
           hasCompletedOnboarding ?? this.hasCompletedOnboarding,
+      hasCompletedHydrationSetup:
+          hasCompletedHydrationSetup ?? this.hasCompletedHydrationSetup,
+      hasRequestedNotifications:
+          hasRequestedNotifications ?? this.hasRequestedNotifications,
       baselinePhotoId: baselinePhotoId ?? this.baselinePhotoId,
       baselineDate: baselineDate ?? this.baselineDate,
       metrics: metrics ?? this.metrics,
@@ -119,6 +144,7 @@ class AppStateModel {
       lastChallengeDate: lastChallengeDate ?? this.lastChallengeDate,
       progressScore: progressScore ?? this.progressScore,
       progressUnlockedAt: progressUnlockedAt ?? this.progressUnlockedAt,
+      chewingLevel: chewingLevel ?? this.chewingLevel,
       settings: settings ?? this.settings,
       createdAt: createdAt ?? this.createdAt,
     );
