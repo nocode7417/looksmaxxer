@@ -227,6 +227,6 @@ final hasRequestedNotificationsProvider = Provider<bool>((ref) {
   return ref.watch(appStateProvider).hasRequestedNotifications;
 });
 
-final chewingLevelProvider = Provider<ChewingLevel>((ref) {
+final appChewingLevelProvider = Provider<ChewingLevel>((ref) {
   return ref.watch(appStateProvider).chewingLevel;
 });

@@ -246,12 +246,15 @@ class UsageTrackingNotifier extends StateNotifier<UsageTrackingState> {
   }
 }
 
-/// Usage tracking provider
-final usageTrackingProvider =
+/// Usage tracking provider (aliased for compatibility)
+final usageTrackingNotifierProvider =
     StateNotifierProvider<UsageTrackingNotifier, UsageTrackingState>((ref) {
   final databaseService = ref.watch(databaseServiceProvider);
   return UsageTrackingNotifier(databaseService);
 });
+
+/// Legacy alias
+final usageTrackingProvider = usageTrackingNotifierProvider;
 
 /// Derived providers
 final shouldShowInterventionProvider = Provider<bool>((ref) {

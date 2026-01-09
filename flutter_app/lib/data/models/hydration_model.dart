@@ -307,7 +307,7 @@ class HydrationStreak {
   final int longestStreak;
   final DateTime? lastGoalReachedDate;
 
-  HydrationStreak({
+  const HydrationStreak({
     required this.currentStreak,
     required this.longestStreak,
     this.lastGoalReachedDate,

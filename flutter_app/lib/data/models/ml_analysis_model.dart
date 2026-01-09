@@ -503,7 +503,7 @@ class MultiFrameData {
   final List<double> yawValues;
   final List<double> rollValues;
 
-  MultiFrameData({
+  const MultiFrameData({
     this.frames = const [],
     this.pitchValues = const [],
     this.yawValues = const [],

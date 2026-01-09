@@ -278,6 +278,13 @@ class ChewingWeekStats {
     required this.dailyStats,
   });
 
+  /// Alias for daysActive
+  int get daysWithChewing => daysActive;
+
+  /// All sessions from this week
+  List<ChewingSession> get sessions =>
+      dailyStats.expand((day) => day.sessions).toList();
+
   /// Create from daily stats
   factory ChewingWeekStats.fromDailyStats(List<ChewingDayStats> dailyStats) {
     if (dailyStats.isEmpty) {
@@ -324,7 +331,7 @@ class ChewingStreak {
   final int longestStreak;
   final DateTime? lastCompletedDate;
 
-  ChewingStreak({
+  const ChewingStreak({
     required this.currentStreak,
     required this.longestStreak,
     this.lastCompletedDate,

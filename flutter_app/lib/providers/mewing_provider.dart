@@ -238,38 +238,60 @@ class MewingNotifier extends StateNotifier<MewingState> {
   }
 }
 
-/// Mewing provider
-final mewingProvider =
+/// Mewing provider (aliased for compatibility)
+final mewingNotifierProvider =
     StateNotifierProvider<MewingNotifier, MewingState>((ref) {
   final databaseService = ref.watch(databaseServiceProvider);
   return MewingNotifier(databaseService);
 });
 
+/// Legacy alias
+final mewingProvider = mewingNotifierProvider;
+
 /// Derived providers
-final hasMewedTodayProvider = Provider<bool>((ref) {
-  return ref.watch(mewingProvider).hasCheckedInToday;
+
+/// Today's mewing session
+final todayMewingProvider = Provider<MewingSession?>((ref) {
+  return ref.watch(mewingNotifierProvider).todaySession;
 });
 
-final mewingStreakProvider = Provider<int>((ref) {
-  return ref.watch(mewingProvider).currentStreakDays;
+/// Has checked in today
+final hasMewedTodayProvider = Provider<bool>((ref) {
+  return ref.watch(mewingNotifierProvider).hasCheckedInToday;
+});
+
+/// Current mewing streak (returns MewingStreak object)
+final mewingStreakProvider = Provider<MewingStreak>((ref) {
+  return ref.watch(mewingNotifierProvider).streak;
+});
+
+/// Just the streak count
+final mewingStreakDaysProvider = Provider<int>((ref) {
+  return ref.watch(mewingNotifierProvider).currentStreakDays;
 });
 
 final mewingLongestStreakProvider = Provider<int>((ref) {
-  return ref.watch(mewingProvider).longestStreakDays;
+  return ref.watch(mewingNotifierProvider).longestStreakDays;
 });
 
 final mewingNextMilestoneProvider = Provider<StreakMilestone?>((ref) {
-  return ref.watch(mewingProvider).nextMilestone;
+  return ref.watch(mewingNotifierProvider).nextMilestone;
 });
 
 final mewingMilestoneProgressProvider = Provider<double>((ref) {
-  return ref.watch(mewingProvider).progressToNextMilestone;
+  return ref.watch(mewingNotifierProvider).progressToNextMilestone;
 });
 
 final mewingCurrentMonthProvider = Provider<MewingMonth?>((ref) {
-  return ref.watch(mewingProvider).currentMonth;
+  return ref.watch(mewingNotifierProvider).currentMonth;
 });
 
 final mewingJustAchievedMilestoneProvider = Provider<StreakMilestone?>((ref) {
-  return ref.watch(mewingProvider).justAchievedMilestone;
+  return ref.watch(mewingNotifierProvider).justAchievedMilestone;
+});
+
+/// Family provider for loading specific months
+final mewingMonthProvider = FutureProvider.family<MewingMonth, DateTime>((ref, month) async {
+  final notifier = ref.watch(mewingNotifierProvider.notifier);
+  return await notifier.loadMonth(month.year, month.month);
 });

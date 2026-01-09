@@ -309,8 +309,22 @@ class MewingCalendar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final monthData = ref.watch(mewingMonthProvider(month));
+    final monthDataAsync = ref.watch(mewingMonthProvider(month));
 
+    return monthDataAsync.when(
+      data: (monthData) => _buildCalendarContent(monthData),
+      loading: () => const Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      error: (_, __) => _buildCalendarContent(null),
+    );
+  }
+
+  Widget _buildCalendarContent(MewingMonth? monthData) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

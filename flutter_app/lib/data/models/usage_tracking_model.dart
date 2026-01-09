@@ -223,7 +223,7 @@ class UsagePattern {
   final Duration averageSessionDuration;
   final List<DateTime> recentAnalysisTimes;
 
-  UsagePattern({
+  const UsagePattern({
     required this.dailySessionCount,
     required this.consecutiveDaysActive,
     required this.analysisCountToday,

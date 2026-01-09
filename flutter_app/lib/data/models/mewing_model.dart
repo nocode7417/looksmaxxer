@@ -184,12 +184,14 @@ class MewingStreak {
   final int longestStreak;
   final DateTime? lastCheckInDate;
   final List<StreakMilestone> achievedMilestones;
+  final int totalCheckIns;
 
-  MewingStreak({
+  const MewingStreak({
     required this.currentStreak,
     required this.longestStreak,
     this.lastCheckInDate,
     this.achievedMilestones = const [],
+    this.totalCheckIns = 0,
   });
 
   factory MewingStreak.empty() {

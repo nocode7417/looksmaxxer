@@ -86,6 +86,22 @@ class ChewingState {
     final seconds = remainingSeconds % 60;
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
+
+  /// Week stats computed from weekHistory
+  ChewingWeekStats? get weekStats {
+    if (weekHistory.isEmpty) return null;
+    return ChewingWeekStats.fromDailyStats(weekHistory);
+  }
+
+  /// Whether timer is running
+  bool get isRunning => activeSession != null;
+
+  /// Elapsed seconds in current session
+  int get elapsedSeconds =>
+      activeSession != null ? targetMinutesToday * 60 - remainingSeconds : 0;
+
+  /// Current target minutes
+  int get targetMinutes => level.dailyTargetMinutes;
 }
 
 /// Chewing notifier with timer logic
@@ -320,14 +336,27 @@ class ChewingNotifier extends StateNotifier<ChewingState> {
   }
 }
 
-/// Chewing provider
-final chewingProvider =
+/// Chewing provider (aliased for compatibility)
+final chewingNotifierProvider =
     StateNotifierProvider<ChewingNotifier, ChewingState>((ref) {
   final databaseService = ref.watch(databaseServiceProvider);
   return ChewingNotifier(databaseService);
 });
 
+/// Legacy alias
+final chewingProvider = chewingNotifierProvider;
+
 /// Derived providers
+
+/// Today's chewing stats
+final todayChewingStatsProvider = Provider<ChewingDayStats?>((ref) {
+  return ref.watch(chewingNotifierProvider).todayStats;
+});
+
+/// Week chewing stats
+final weekChewingStatsProvider = Provider<ChewingWeekStats?>((ref) {
+  return ref.watch(chewingNotifierProvider).weekStats;
+});
 final isChewingActiveProvider = Provider<bool>((ref) {
   return ref.watch(chewingProvider).isSessionActive;
 });

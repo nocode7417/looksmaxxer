@@ -42,6 +42,11 @@ class HydrationState {
   /// Progress percentage for today (0.0 to 1.0)
   double get todayProgress => today?.progressPercentage ?? 0.0;
 
+  /// All logs from this week
+  List<HydrationLog> get weekLogs {
+    return weekHistory.expand((day) => day.logs).toList();
+  }
+
   /// Whether goal is reached today
   bool get goalReachedToday => today?.goalReached ?? false;
 
@@ -232,34 +237,48 @@ class HydrationNotifier extends StateNotifier<HydrationState> {
   }
 }
 
-/// Hydration provider
-final hydrationProvider =
+/// Hydration provider (aliased for compatibility)
+final hydrationNotifierProvider =
     StateNotifierProvider<HydrationNotifier, HydrationState>((ref) {
   final databaseService = ref.watch(databaseServiceProvider);
   return HydrationNotifier(databaseService);
 });
 
+/// Legacy alias
+final hydrationProvider = hydrationNotifierProvider;
+
 /// Derived providers
 final todayHydrationProvider = Provider<HydrationDay?>((ref) {
-  return ref.watch(hydrationProvider).today;
+  return ref.watch(hydrationNotifierProvider).today;
 });
 
 final hydrationGoalProvider = Provider<HydrationGoal?>((ref) {
-  return ref.watch(hydrationProvider).goal;
+  return ref.watch(hydrationNotifierProvider).goal;
 });
 
 final hydrationProgressProvider = Provider<double>((ref) {
-  return ref.watch(hydrationProvider).todayProgress;
+  return ref.watch(hydrationNotifierProvider).todayProgress;
 });
 
-final hydrationStreakProvider = Provider<int>((ref) {
-  return ref.watch(hydrationProvider).streak.currentStreak;
+/// Returns HydrationStreak object
+final hydrationStreakProvider = Provider<HydrationStreak>((ref) {
+  return ref.watch(hydrationNotifierProvider).streak;
+});
+
+/// Just the streak count
+final hydrationStreakDaysProvider = Provider<int>((ref) {
+  return ref.watch(hydrationNotifierProvider).streak.currentStreak;
 });
 
 final hasReachedHydrationGoalProvider = Provider<bool>((ref) {
-  return ref.watch(hydrationProvider).goalReachedToday;
+  return ref.watch(hydrationNotifierProvider).goalReachedToday;
 });
 
 final hydrationRemainingProvider = Provider<int>((ref) {
-  return ref.watch(hydrationProvider).remainingMl;
+  return ref.watch(hydrationNotifierProvider).remainingMl;
+});
+
+/// Week logs provider
+final weekHydrationLogsProvider = Provider<List<HydrationLog>>((ref) {
+  return ref.watch(hydrationNotifierProvider).weekLogs;
 });
