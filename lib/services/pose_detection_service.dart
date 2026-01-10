@@ -15,6 +15,12 @@ class PoseDetectionService {
   Stream<PoseData>? _poseDataStream;
   bool _isInitialized = false;
 
+  /// Protected getter for subclasses
+  bool get isInitialized => _isInitialized;
+
+  /// Protected setter for subclasses
+  set isInitializedFlag(bool value) => _isInitialized = value;
+
   /// Initialize pose detection with camera
   Future<bool> initialize({
     required CameraDescription camera,
@@ -38,7 +44,7 @@ class PoseDetectionService {
 
   /// Start pose detection stream
   Stream<PoseData> getPoseStream() {
-    if (!_isInitialized) {
+    if (!isInitialized) {
       throw StateError('Pose detection not initialized');
     }
 
@@ -216,9 +222,17 @@ class PerformanceMetrics {
 }
 
 /// Mock implementation for development/testing without native code
+/// Simulates realistic exercise movements for rep detection testing
 class MockPoseDetectionService extends PoseDetectionService {
   final StreamController<PoseData> _controller = StreamController<PoseData>.broadcast();
   Timer? _mockTimer;
+  int _frameCount = 0;
+
+  // Movement simulation state
+  double _movementPhase = 0.0; // 0-1 representing movement cycle
+
+  // Rep timing: each rep takes ~3 seconds (90 frames at 30fps)
+  static const int _framesPerRep = 90;
 
   @override
   Future<bool> initialize({
@@ -226,7 +240,7 @@ class MockPoseDetectionService extends PoseDetectionService {
     required double targetFps,
   }) async {
     await Future.delayed(const Duration(milliseconds: 500));
-    _isInitialized = true;
+    isInitializedFlag = true;
     _startMockStream();
     return true;
   }
@@ -234,31 +248,157 @@ class MockPoseDetectionService extends PoseDetectionService {
   void _startMockStream() {
     // Generate mock pose data at 30fps
     _mockTimer = Timer.periodic(const Duration(milliseconds: 33), (_) {
-      _controller.add(_generateMockPose());
+      _frameCount++;
+      _updateMovementPhase();
+      _controller.add(_generateAnimatedPose());
     });
   }
 
-  PoseData _generateMockPose() {
-    // Generate realistic mock landmarks
+  void _updateMovementPhase() {
+    // Create a smooth sine wave movement pattern
+    // Each cycle (rep) takes _framesPerRep frames
+    final cycleProgress = (_frameCount % _framesPerRep) / _framesPerRep;
+
+    // Use sine wave for smooth movement: 0 -> 1 -> 0
+    _movementPhase = (1 - (cycleProgress * 2 - 1).abs());
+  }
+
+  PoseData _generateAnimatedPose() {
+    // Movement amount (0 = rest, 1 = peak of movement)
+    final movement = _movementPhase;
+
+    // === CHIN TUCK SIMULATION ===
+    // At rest: ear is forward of shoulder (ear.x = 0.45, shoulder.x = 0.40)
+    // At peak: ear aligns with shoulder (ear.x = 0.40, shoulder.x = 0.40)
+    // The detector checks if horizontal distance DECREASES
+    final earForwardOffset = 0.08 * (1 - movement); // Starts at 0.08, goes to 0
+
+    // === PUSH-UP SIMULATION ===
+    // At rest (up): elbow extended (~160° angle)
+    // At peak (down): elbow bent (~90° angle)
+    // Elbow moves down and out as you go down in a push-up
+    final elbowDropY = movement * 0.12; // Elbow drops as arm bends
+    final bodyDropY = movement * 0.05;
+
+    // === FACE PULL SIMULATION ===
+    // At rest: wrists below shoulder
+    // At peak: wrists at face level (above shoulder)
+    final wristRiseY = movement * 0.30;
+
+    // === NECK CURL SIMULATION ===
+    // At rest: nose level with ears
+    // At peak: nose below ears (chin to chest)
+    final noseDropY = movement * 0.10;
+
+    // Base positions
+    const shoulderY = 0.40;
+    const elbowY = 0.55;
+    const wristY = 0.65;
+    const earY = 0.28;
+    const noseY = 0.25;
+
     return PoseData(
       landmarks: {
-        BodyLandmark.nose: const Landmark(x: 0.5, y: 0.3, confidence: 0.9),
-        BodyLandmark.leftEye: const Landmark(x: 0.48, y: 0.28, confidence: 0.9),
-        BodyLandmark.rightEye: const Landmark(x: 0.52, y: 0.28, confidence: 0.9),
-        BodyLandmark.leftEar: const Landmark(x: 0.45, y: 0.3, confidence: 0.85),
-        BodyLandmark.rightEar: const Landmark(x: 0.55, y: 0.3, confidence: 0.85),
-        BodyLandmark.leftShoulder: const Landmark(x: 0.4, y: 0.5, confidence: 0.9),
-        BodyLandmark.rightShoulder: const Landmark(x: 0.6, y: 0.5, confidence: 0.9),
-        BodyLandmark.leftElbow: const Landmark(x: 0.35, y: 0.65, confidence: 0.85),
-        BodyLandmark.rightElbow: const Landmark(x: 0.65, y: 0.65, confidence: 0.85),
-        BodyLandmark.leftWrist: const Landmark(x: 0.32, y: 0.75, confidence: 0.8),
-        BodyLandmark.rightWrist: const Landmark(x: 0.68, y: 0.75, confidence: 0.8),
-        BodyLandmark.leftHip: const Landmark(x: 0.42, y: 0.7, confidence: 0.9),
-        BodyLandmark.rightHip: const Landmark(x: 0.58, y: 0.7, confidence: 0.9),
-        BodyLandmark.leftKnee: const Landmark(x: 0.43, y: 0.85, confidence: 0.85),
-        BodyLandmark.rightKnee: const Landmark(x: 0.57, y: 0.85, confidence: 0.85),
-        BodyLandmark.leftAnkle: const Landmark(x: 0.44, y: 0.95, confidence: 0.8),
-        BodyLandmark.rightAnkle: const Landmark(x: 0.56, y: 0.95, confidence: 0.8),
+        // Head - nose drops for neck curl
+        BodyLandmark.nose: Landmark(
+          x: 0.5,
+          y: noseY + bodyDropY + noseDropY,
+          confidence: 0.9,
+        ),
+        BodyLandmark.leftEye: Landmark(
+          x: 0.47,
+          y: noseY - 0.02 + bodyDropY,
+          confidence: 0.9,
+        ),
+        BodyLandmark.rightEye: Landmark(
+          x: 0.53,
+          y: noseY - 0.02 + bodyDropY,
+          confidence: 0.9,
+        ),
+
+        // Ears - move back for chin tuck (horizontal distance to shoulder decreases)
+        BodyLandmark.leftEar: Landmark(
+          x: 0.35 + earForwardOffset, // 0.43 at rest → 0.35 at peak (moves back toward shoulder)
+          y: earY + bodyDropY,
+          confidence: 0.85,
+        ),
+        BodyLandmark.rightEar: Landmark(
+          x: 0.65 - earForwardOffset, // 0.57 at rest → 0.65 at peak
+          y: earY + bodyDropY,
+          confidence: 0.85,
+        ),
+
+        // Shoulders - stable reference at x=0.35 and x=0.65
+        BodyLandmark.leftShoulder: Landmark(
+          x: 0.35,
+          y: shoulderY + bodyDropY,
+          confidence: 0.9,
+        ),
+        BodyLandmark.rightShoulder: Landmark(
+          x: 0.65,
+          y: shoulderY + bodyDropY,
+          confidence: 0.9,
+        ),
+
+        // Elbows - drop for push-ups (changes the shoulder-elbow-wrist angle)
+        BodyLandmark.leftElbow: Landmark(
+          x: 0.30,
+          y: elbowY + bodyDropY + elbowDropY,
+          confidence: 0.85,
+        ),
+        BodyLandmark.rightElbow: Landmark(
+          x: 0.70,
+          y: elbowY + bodyDropY + elbowDropY,
+          confidence: 0.85,
+        ),
+
+        // Wrists - rise for face pulls
+        BodyLandmark.leftWrist: Landmark(
+          x: 0.28,
+          y: wristY + bodyDropY - wristRiseY, // Goes from 0.65 to 0.35 (above shoulder)
+          confidence: 0.8,
+        ),
+        BodyLandmark.rightWrist: Landmark(
+          x: 0.72,
+          y: wristY + bodyDropY - wristRiseY,
+          confidence: 0.8,
+        ),
+
+        // Hips
+        BodyLandmark.leftHip: Landmark(
+          x: 0.42,
+          y: 0.60 + bodyDropY,
+          confidence: 0.9,
+        ),
+        BodyLandmark.rightHip: Landmark(
+          x: 0.58,
+          y: 0.60 + bodyDropY,
+          confidence: 0.9,
+        ),
+
+        // Knees
+        BodyLandmark.leftKnee: Landmark(
+          x: 0.43,
+          y: 0.75 + bodyDropY,
+          confidence: 0.85,
+        ),
+        BodyLandmark.rightKnee: Landmark(
+          x: 0.57,
+          y: 0.75 + bodyDropY,
+          confidence: 0.85,
+        ),
+
+        // Ankles - stable
+        BodyLandmark.leftAnkle: const Landmark(
+          x: 0.44,
+          y: 0.90,
+          confidence: 0.8,
+        ),
+        BodyLandmark.rightAnkle: const Landmark(
+          x: 0.56,
+          y: 0.90,
+          confidence: 0.8,
+        ),
       },
       timestamp: DateTime.now(),
       overallConfidence: 0.87,
@@ -267,7 +407,7 @@ class MockPoseDetectionService extends PoseDetectionService {
 
   @override
   Stream<PoseData> getPoseStream() {
-    if (!_isInitialized) {
+    if (!isInitialized) {
       throw StateError('Pose detection not initialized');
     }
     return _controller.stream;
@@ -276,7 +416,8 @@ class MockPoseDetectionService extends PoseDetectionService {
   @override
   Future<void> stop() async {
     _mockTimer?.cancel();
-    _isInitialized = false;
+    _mockTimer = null;
+    isInitializedFlag = false;
   }
 
   @override
