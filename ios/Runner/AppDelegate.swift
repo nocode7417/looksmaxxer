@@ -8,6 +8,10 @@ import UIKit
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+
+    // Register pose detection plugin for workout motion tracking
+    PoseDetectionPlugin.register(with: self.registrar(forPlugin: "PoseDetectionPlugin")!)
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }

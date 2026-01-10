@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
 import 'tabs/today_tab.dart';
 import 'tabs/timeline_tab.dart';
+import 'tabs/workouts_tab.dart';
 import 'tabs/baseline_tab.dart';
 import 'tabs/profile_tab.dart';
 
@@ -31,6 +32,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         children: [
           TodayTab(onCapturePhoto: widget.onCapturePhoto),
           const TimelineTab(),
+          const WorkoutsTab(),
           const BaselineTab(),
           const ProfileTab(),
         ],
@@ -68,11 +70,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
               _buildNavItem(
                 index: 2,
+                icon: LucideIcons.dumbbell,
+                label: 'Workouts',
+              ),
+              _buildNavItem(
+                index: 3,
                 icon: LucideIcons.target,
                 label: 'Baseline',
               ),
               _buildNavItem(
-                index: 3,
+                index: 4,
                 icon: LucideIcons.user,
                 label: 'Profile',
               ),

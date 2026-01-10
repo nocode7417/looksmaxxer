@@ -42,3 +42,13 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // ML Kit Pose Detection for workout motion tracking
+    implementation("com.google.mlkit:pose-detection-accurate:18.0.0-beta5")
+
+    // CameraX for camera access
+    implementation("androidx.camera:camera-core:1.3.1")
+    implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+}

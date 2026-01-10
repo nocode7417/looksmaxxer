@@ -682,4 +682,245 @@ class DatabaseService {
     await db.delete(AppConstants.usageSessionsTable);
     await db.delete(AppConstants.interventionsLogTable);
   }
+
+  // ============================================================
+  // EXERCISE PROGRAM METHODS
+  // ============================================================
+
+  /// Get exercise program
+  Future<Map<String, dynamic>?> getExerciseProgram() async {
+    final db = await database;
+    final maps = await db.query(
+      'exercise_program',
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+
+    // Parse JSON data
+    final programData = Map<String, dynamic>.from(maps.first);
+    return programData;
+  }
+
+  /// Save exercise program
+  Future<void> saveExerciseProgram(Map<String, dynamic> program) async {
+    final db = await database;
+    await db.insert(
+      'exercise_program',
+      {'id': 'default', 'data': program.toString()},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  // ============================================================
+  // GEOMETRY METRICS METHODS
+  // ============================================================
+
+  /// Get all geometry analyses
+  Future<List<Map<String, dynamic>>> getGeometryAnalyses() async {
+    final db = await database;
+    final maps = await db.query(
+      'geometry_analyses',
+      orderBy: 'analyzedAt DESC',
+    );
+    return maps;
+  }
+
+  /// Save geometry analysis
+  Future<void> saveGeometryAnalysis(Map<String, dynamic> analysis) async {
+    final db = await database;
+    await db.insert(
+      'geometry_analyses',
+      analysis,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  // ============================================================
+  // WORKOUT METHODS
+  // ============================================================
+
+  /// Get workout program
+  Future<Map<String, dynamic>?> getWorkoutProgram() async {
+    final db = await database;
+    final maps = await db.query(
+      'workout_program',
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return Map<String, dynamic>.from(maps.first);
+  }
+
+  /// Save workout program
+  Future<void> saveWorkoutProgram(Map<String, dynamic> program) async {
+    final db = await database;
+
+    // Ensure table exists
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS workout_program (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      )
+    ''');
+
+    await db.insert(
+      'workout_program',
+      {
+        'id': 'default',
+        'data': program.toString(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Save workout session
+  Future<void> saveWorkoutSession(Map<String, dynamic> session) async {
+    final db = await database;
+
+    // Ensure table exists
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS workout_sessions (
+        id TEXT PRIMARY KEY,
+        workoutType TEXT NOT NULL,
+        level TEXT NOT NULL,
+        startTime TEXT NOT NULL,
+        endTime TEXT,
+        setsData TEXT NOT NULL,
+        configData TEXT NOT NULL,
+        completed INTEGER NOT NULL DEFAULT 0,
+        notes TEXT,
+        totalReps INTEGER NOT NULL DEFAULT 0,
+        averageFormAccuracy REAL NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.insert(
+      'workout_sessions',
+      {
+        'id': session['id'],
+        'workoutType': session['workoutType'],
+        'level': session['level'],
+        'startTime': session['startTime'],
+        'endTime': session['endTime'],
+        'setsData': session['sets'].toString(),
+        'configData': session['config'].toString(),
+        'completed': session['completed'] ? 1 : 0,
+        'notes': session['notes'],
+        'totalReps': _calculateTotalReps(session),
+        'averageFormAccuracy': _calculateAvgAccuracy(session),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  int _calculateTotalReps(Map<String, dynamic> session) {
+    final sets = session['sets'] as List?;
+    if (sets == null) return 0;
+    return sets.fold<int>(0, (sum, set) => sum + ((set['validReps'] as int?) ?? 0));
+  }
+
+  double _calculateAvgAccuracy(Map<String, dynamic> session) {
+    final sets = session['sets'] as List?;
+    if (sets == null || sets.isEmpty) return 0.0;
+    final total = sets.fold<double>(
+      0.0,
+      (sum, set) => sum + ((set['averageFormAccuracy'] as double?) ?? 0.0),
+    );
+    return total / sets.length;
+  }
+
+  /// Get all workout sessions
+  Future<List<Map<String, dynamic>>> getAllWorkoutSessions() async {
+    final db = await database;
+
+    // Check if table exists
+    final tables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='workout_sessions'",
+    );
+    if (tables.isEmpty) return [];
+
+    final maps = await db.query(
+      'workout_sessions',
+      orderBy: 'startTime DESC',
+    );
+    return maps;
+  }
+
+  /// Get workout sessions by type
+  Future<List<Map<String, dynamic>>> getWorkoutSessionsByType(String workoutType) async {
+    final db = await database;
+
+    // Check if table exists
+    final tables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='workout_sessions'",
+    );
+    if (tables.isEmpty) return [];
+
+    final maps = await db.query(
+      'workout_sessions',
+      where: 'workoutType = ?',
+      whereArgs: [workoutType],
+      orderBy: 'startTime DESC',
+    );
+    return maps;
+  }
+
+  /// Get workout sessions in date range
+  Future<List<Map<String, dynamic>>> getWorkoutSessionsInRange(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final db = await database;
+
+    // Check if table exists
+    final tables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='workout_sessions'",
+    );
+    if (tables.isEmpty) return [];
+
+    final maps = await db.query(
+      'workout_sessions',
+      where: 'startTime >= ? AND startTime <= ?',
+      whereArgs: [start.toIso8601String(), end.toIso8601String()],
+      orderBy: 'startTime DESC',
+    );
+    return maps;
+  }
+
+  /// Get workout statistics
+  Future<Map<String, dynamic>> getWorkoutStats() async {
+    final db = await database;
+
+    // Check if table exists
+    final tables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='workout_sessions'",
+    );
+    if (tables.isEmpty) {
+      return {
+        'totalSessions': 0,
+        'totalReps': 0,
+        'avgFormAccuracy': 0.0,
+      };
+    }
+
+    final countResult = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM workout_sessions WHERE completed = 1',
+    );
+    final totalSessions = Sqflite.firstIntValue(countResult) ?? 0;
+
+    final repsResult = await db.rawQuery(
+      'SELECT SUM(totalReps) as total FROM workout_sessions WHERE completed = 1',
+    );
+    final totalReps = Sqflite.firstIntValue(repsResult) ?? 0;
+
+    final avgResult = await db.rawQuery(
+      'SELECT AVG(averageFormAccuracy) as avg FROM workout_sessions WHERE completed = 1',
+    );
+    final avgAccuracy = (avgResult.first['avg'] as double?) ?? 0.0;
+
+    return {
+      'totalSessions': totalSessions,
+      'totalReps': totalReps,
+      'avgFormAccuracy': avgAccuracy,
+    };
+  }
 }

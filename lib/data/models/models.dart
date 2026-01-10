@@ -6,3 +6,6 @@ export 'mewing_model.dart';
 export 'chewing_model.dart';
 export 'usage_tracking_model.dart';
 export 'ml_analysis_model.dart';
+export 'geometry_metrics_model.dart';
+export 'orthotropic_exercise_model.dart';
+export 'workout_model.dart';

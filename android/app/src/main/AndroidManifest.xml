@@ -13,6 +13,9 @@
     <!-- Internet permission (for future updates) -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Vibration permission for haptic feedback during workouts -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <application
         android:label="Looksmaxxer"
         android:name="${applicationName}"
